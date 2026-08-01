@@ -36,9 +36,32 @@ QUICK_SYMBOLS = ["BTC", "ETH", "SOL", "BNB", "XRP", "SUI", "1000SHIB"]
 QUICK_LEVERAGES = [5, 10, 20, 25, 50]
 SEP = "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"
 
-# ─── لود نمادها از Binance ──────────────────────────────────────────────────
+# لیست ثابت پشتیبان — همیشه در دسترسه حتی اگه اتصال به Binance REST قطع باشه
+STATIC_SYMBOLS = sorted(set([
+    "BTC","ETH","BNB","SOL","XRP","ADA","DOGE","TRX","TON","AVAX","SHIB","1000SHIB",
+    "DOT","LINK","MATIC","LTC","BCH","UNI","ATOM","XLM","ETC","FIL","APT","ARB","OP",
+    "NEAR","IMX","VET","HBAR","GRT","ALGO","SAND","MANA","AXS","THETA","EOS","AAVE",
+    "MKR","SNX","COMP","XTZ","EGLD","FLOW","CHZ","ENJ","ZEC","DASH","XMR","KSM",
+    "RUNE","1INCH","SUSHI","CRV","YFI","BAT","ZIL","IOTA","NEO","WAVES","QTUM",
+    "ICX","ONT","ZRX","OMG","KAVA","BAND","STORJ","CTSI","SKL","CELR","ANKR",
+    "RSR","OCEAN","CVC","DENT","HOT","WIN","BTT","STMX","IOST","DGB","SC",
+    "RVN","XVG","ZEN","LSK","ARK","STRAX","NANO","XEM","BTS","STEEM","GAS",
+    "SUI","SEI","TIA","INJ","PYTH","JTO","JUP","STRK","WLD","PEPE","WIF","BOME",
+    "FLOKI","BONK","1000BONK","1000PEPE","1000FLOKI","MEME","ORDI","SATS","1000SATS",
+    "RATS","NOT","DOGS","ETHFI","ENA","REZ","BB","IO","ZK","ZRO","LISTA","TAO",
+    "OM","ONDO","AEVO","ALT","MANTA","PYR","XAI","AI","NFP","GALA","APE","GMT",
+    "GST","LDO","OP","ARB","BLUR","ID","MAGIC","HIGH","GNS","GMX","DYDX","PERP",
+    "RDNT","FXS","PENDLE","ETHW","CFX","LQTY","JOE","T","MASK","LRC","BAL",
+    "REN","KNC","BAKE","ALPHA","BEL","RLC","TRB","OGN","NKN","COTI","AR",
+    "ROSE","JASMY","API3","AUCTION","POWR","MTL","ANT","SUPER","PYTH","W","BOME",
+    "ETHFI","ENA","PIXEL","STRK","DYM","PORTAL","AXL","METIS","AGIX","FET",
+    "OCEAN","RNDR","THETA","VELO","TWT","CAKE","ALPACA","BURGER","DODO",
+    "LINA","BAND","AKT","AGLD","LOOM","QUICK","POND","PROM","PHB","TLM",
+    "ALICE","VOXEL","YGG","ILV","PSG","BAR","JUV","ATM","CITY","LAZIO",
+]))
 
 def load_binance_symbols() -> list[str]:
+    """تلاش می‌کنه لیست کامل و به‌روز رو از Binance بگیره، اگه نشد از لیست ثابت استفاده می‌کنه"""
     try:
         url = "https://fapi.binance.com/fapi/v1/exchangeInfo"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -49,11 +72,12 @@ def load_binance_symbols() -> list[str]:
             for s in data.get("symbols", [])
             if s.get("status") == "TRADING" and s.get("contractType") == "PERPETUAL"
         ]
-        log.info(f"✅ {len(syms)} نماد فیوچرز از Binance لود شد")
-        return sorted(set(syms))
+        combined = sorted(set(syms) | set(STATIC_SYMBOLS))
+        log.info(f"✅ {len(syms)} نماد از Binance گرفته شد (مجموع با لیست ثابت: {len(combined)})")
+        return combined
     except Exception as e:
-        log.warning(f"نشد نمادهای Binance رو بگیریم: {e}")
-        return []
+        log.warning(f"⚠️ نشد نمادهای Binance رو بگیریم، از لیست ثابت ({len(STATIC_SYMBOLS)} نماد) استفاده می‌شه: {e}")
+        return STATIC_SYMBOLS
 
 def search_symbols(query: str) -> list[str]:
     q = query.upper().replace("USDT","").strip()
