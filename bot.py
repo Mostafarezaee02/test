@@ -105,24 +105,21 @@ async def load_binance_symbols_async() -> list[str]:
     return await asyncio.to_thread(load_binance_symbols)
 
 
-def fetch_market_price(display_symbol: str):
+async def fetch_market_price_async(display_symbol: str) -> float | None:
     """
-    قیمت لحظه‌ای رو مستقیم با یه درخواست REST سبک می‌گیره (برای گزینه‌ی «ورود = مارکت»).
-    از فید وب‌سوکت استفاده نمی‌کنیم چون ممکنه هنوز subscribe نشده باشه؛ REST سریع‌تر و مطمئن‌تره.
+    قیمت لحظه‌ای رو برای گزینه‌ی «ورود = مارکت» می‌گیره.
+    چون REST بایننس از Railway بلاک هست (451)، از فید وب‌سوکت استفاده می‌کنیم:
+    subscribe می‌کنیم، کمی صبر می‌کنیم تا اولین تیک بیاد، قیمت رو می‌گیریم.
     """
-    try:
-        url = f"{config.BINANCE_REST_BASE}/fapi/v1/ticker/price?symbol={display_symbol}"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=6) as r:
-            data = _json.loads(r.read())
-        return float(data["price"])
-    except Exception as e:
-        log.warning(f"⚠️ خطا در گرفتن قیمت مارکت {display_symbol}: {e}")
-        return None
-
-
-async def fetch_market_price_async(display_symbol: str):
-    return await asyncio.to_thread(fetch_market_price, display_symbol)
+    ws_symbol = to_ws_symbol(display_symbol.replace("USDT", ""))
+    await feed.subscribe(ws_symbol)
+    # صبر می‌کنیم تا حداکثر ۵ ثانیه قیمت برسه
+    for _ in range(50):
+        price = feed.prices.get(ws_symbol)
+        if price:
+            return price
+        await asyncio.sleep(0.1)
+    return None
 
 
 def search_symbols(query: str) -> list[str]:
@@ -712,18 +709,22 @@ async def step_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @only_owner
 async def step_entry_market(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
-    await q.answer("⏳ در حال گرفتن قیمت لحظه‌ای...")
     if q.data == "cancel":
+        await q.answer()
         await q.edit_message_text("❌ سیگنال لغو شد.")
         return ConversationHandler.END
     symbol = context.user_data.get("symbol")
     if not symbol:
+        await q.answer("❌ خطای داخلی")
         await q.edit_message_text("❌ خطای داخلی — دوباره با /signal شروع کن.")
         return ConversationHandler.END
+    await q.answer("⏳ در حال گرفتن قیمت لحظه‌ای...")
     price = await fetch_market_price_async(symbol)
     if price is None:
-        await q.edit_message_text(
-            "⚠️ گرفتن قیمت مارکت الان ممکن نشد. لطفاً نقطه ورود رو دستی تایپ کن:",
+        # بعد از answer()، edit روی همون پیام ممکنه fail کنه؛ reply مطمئن‌تره
+        await q.message.reply_text(
+            "⚠️ قیمت لحظه‌ای هنوز از فید دریافت نشده (ممکنه چند ثانیه طول بکشه).\n"
+            "نقطه ورود رو دستی تایپ کن:",
             reply_markup=make_entry_keyboard(),
         )
         return ENTRY
