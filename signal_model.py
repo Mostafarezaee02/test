@@ -15,6 +15,7 @@ class Signal:
     side: str                     # LONG یا SHORT
     leverage: float
     entry: float
+    entry_is_market: bool = False  # اگه True یعنی نقطه ورود = قیمت مارکت لحظه‌ی ثبت سیگنال
     stop_loss: Optional[float] = None
     take_profit: Optional[float] = None
     chat_id: Optional[int] = None
@@ -108,7 +109,13 @@ def _fmt_duration_fa(seconds: float) -> str:
     return f"{s} ثانیه"
 
 
-def format_signal_message(sig: Signal, price: Optional[float]) -> str:
+def _fmt_entry(sig: Signal) -> str:
+    if sig.entry_is_market:
+        return f"مارکت (<code>{_fmt_num(sig.entry)}</code>)"
+    return f"<code>{_fmt_num(sig.entry)}</code>"
+
+
+def format_signal_message(sig: Signal, price: Optional[float], stale: bool = False) -> str:
     side_fa = "لانگ 🟩" if sig.side == "LONG" else "شورت 🟥"
     arrow = "📈" if sig.side == "LONG" else "📉"
     ts = time.strftime("%H:%M:%S", time.localtime(sig.updated_at))
@@ -126,7 +133,7 @@ def format_signal_message(sig: Signal, price: Optional[float]) -> str:
             f"{arrow} <b>سیگنال {sig.symbol}</b>  |  {side_fa}",
             "",
             f"⚙️ اهرم: <code>{sig.leverage}x</code>",
-            f"🎯 نقطه ورود: <code>{_fmt_num(sig.entry)}</code>",
+            f"🎯 نقطه ورود: {_fmt_entry(sig)}",
             f"💰 قیمت لحظه‌ای: <code>{_fmt_num(price) if price else '...'}</code>",
         ]
         if sig.stop_loss:
@@ -138,6 +145,10 @@ def format_signal_message(sig: Signal, price: Optional[float]) -> str:
         lines.append(f"{mood_emoji} وضعیت: <b>{mood_text} ({pnl:+.2f}%)</b>")
         if sig.best_pnl > 0.0001:
             lines.append(f"📈 بیشترین سود لحظه‌ای: <b>+{sig.best_pnl:.2f}%</b>")
+
+        if stale:
+            lines.append("")
+            lines.append("⚠️ قیمت لحظه‌ای موقتاً از منبع دریافت نمی‌شه — آخرین قیمت معتبر نمایش داده شده.")
 
         lines.append("")
         lines.append(f"⏱ مدت باز بودن: {_fmt_duration_fa(time.time() - sig.created_at)}")
@@ -160,7 +171,7 @@ def format_signal_message(sig: Signal, price: Optional[float]) -> str:
             f"{arrow} <b>سیگنال {sig.symbol}</b>  |  {side_fa}  |  <b>{title}</b>",
             "",
             f"⚙️ اهرم: <code>{sig.leverage}x</code>",
-            f"🎯 نقطه ورود: <code>{_fmt_num(sig.entry)}</code>",
+            f"🎯 نقطه ورود: {_fmt_entry(sig)}",
             f"🚪 قیمت خروج: <code>{_fmt_num(final_price)}</code>",
         ]
         lines.append("")
